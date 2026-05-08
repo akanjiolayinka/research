@@ -17,30 +17,31 @@ export default function Modal({ open, onClose, title, children }: Props) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
         >
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60"
           />
           <motion.div
-            className="glass-strong relative z-10 w-full max-w-lg rounded-2xl p-6 shadow-glow"
-            initial={{ y: 20, scale: 0.96, opacity: 0 }}
-            animate={{ y: 0, scale: 1, opacity: 1 }}
-            exit={{ y: 10, scale: 0.98, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 360, damping: 30 }}
+            className="relative z-10 w-full max-w-lg rounded-lg border border-white/[0.08] bg-panel p-6 shadow-elevated"
+            initial={{ y: 8, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 4, opacity: 0 }}
+            transition={{ duration: 0.15 }}
           >
             {title && (
-              <h2 className="mb-3 font-display text-lg font-semibold">{title}</h2>
+              <h2 className="mb-3 text-base font-semibold text-slate-100">{title}</h2>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="absolute right-4 top-4 text-slate-400 transition hover:text-white"
+              className="btn-ghost absolute right-3 top-3 h-8 w-8 p-0"
               aria-label="Close"
             >
-              <X size={18} />
+              <X size={15} />
             </button>
             {children}
           </motion.div>

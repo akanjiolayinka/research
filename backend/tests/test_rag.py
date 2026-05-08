@@ -31,12 +31,19 @@ def test_unique_sources_dedupes_in_order():
 
 
 def test_answer_stream_emits_sources_then_tokens(monkeypatch):
-    fake_matches = [{"score": 1.0, "metadata": {"source": "x.txt", "text": "context"}}]
-    monkeypatch.setattr(rag, "retrieve", lambda q, top_k=None: fake_matches)
+    fake_matches = [
+        {"score": 1.0, "metadata": {"source": "x.txt", "chunk_idx": 0, "text": "context"}}
+    ]
+    monkeypatch.setattr(rag, "retrieve", lambda q, top_k=None, namespace=None: fake_matches)
     monkeypatch.setattr(rag, "chat_stream", lambda messages: iter(["Hello", " world"]))
 
     events = list(rag.answer_stream("question?"))
-    assert events[0] == {"type": "sources", "sources": ["x.txt"]}
+    assert events[0]["type"] == "sources"
+    assert events[0]["sources"] == ["x.txt"]
+    assert events[0]["chunks"][0]["source"] == "x.txt"
+    assert events[0]["chunks"][0]["chunk_idx"] == 0
+    assert events[0]["chunks"][0]["score"] == 1.0
+    assert events[0]["chunks"][0]["text"] == "context"
     token_texts = [e["text"] for e in events if e["type"] == "token"]
     assert token_texts == ["Hello", " world"]
     assert events[-1] == {"type": "done"}

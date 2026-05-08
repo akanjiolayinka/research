@@ -244,7 +244,7 @@ export default function App() {
     saveDocs(next);
     toast.message(`Ingesting ${file.name}…`);
     try {
-      const result = await ingestFile(file);
+      const result = await ingestFile(file, { namespace });
       const updated = next.map((d) =>
         d.id === optimistic.id
           ? { ...d, chunks: result.chunks, status: "indexed" as const }
@@ -385,10 +385,10 @@ export default function App() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={view}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
                 className="flex h-full min-h-0 flex-1 flex-col"
               >
                 {renderMain()}

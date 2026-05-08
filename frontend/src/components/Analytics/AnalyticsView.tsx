@@ -17,11 +17,15 @@ interface Props {
 }
 
 const tooltipStyle = {
-  background: "rgba(13,17,23,0.95)",
-  border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 12,
+  background: "#13161A",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 6,
   fontSize: 12,
 } as const;
+
+const ACCENT = "#6366F1";
+const GRID = "rgba(255,255,255,0.05)";
+const AXIS = "#6B7280";
 
 export default function AnalyticsView({ sessions }: Props) {
   const allMessages = sessions.flatMap((s) => s.messages);
@@ -55,8 +59,8 @@ export default function AnalyticsView({ sessions }: Props) {
   }, [allChunks]);
 
   const histogram = useMemo(() => {
-    const bins = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
     const labels = ["0-0.2", "0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0"];
+    const bins = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
     const counts = labels.map(() => 0);
     for (const c of allChunks) {
       for (let i = 0; i < bins.length - 1; i++) {
@@ -75,22 +79,31 @@ export default function AnalyticsView({ sessions }: Props) {
   );
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto px-6 py-6">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-4 overflow-y-auto px-6 py-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-100">
+          Analytics
+        </h1>
+        <p className="mt-1 text-sm text-slate-400">
+          Computed from your local chat history.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Queries over the last 7 days">
-          <ResponsiveContainer width="100%" height={220}>
+        <Card title="Queries — last 7 days">
+          <ResponsiveContainer width="100%" height={200}>
             <LineChart data={queriesPerDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="day" stroke="#94A3B8" fontSize={11} />
-              <YAxis stroke="#94A3B8" fontSize={11} allowDecimals={false} />
+              <CartesianGrid stroke={GRID} />
+              <XAxis dataKey="day" stroke={AXIS} fontSize={11} tickLine={false} />
+              <YAxis stroke={AXIS} fontSize={11} allowDecimals={false} tickLine={false} />
               <Tooltip contentStyle={tooltipStyle} />
               <Line
                 type="monotone"
                 dataKey="count"
-                stroke="#7C3AED"
-                strokeWidth={2.5}
-                dot={{ r: 3, fill: "#7C3AED" }}
-                activeDot={{ r: 5 }}
+                stroke={ACCENT}
+                strokeWidth={2}
+                dot={{ r: 2.5, fill: ACCENT, strokeWidth: 0 }}
+                activeDot={{ r: 4 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -100,19 +113,20 @@ export default function AnalyticsView({ sessions }: Props) {
           {topDocs.length === 0 ? (
             <Empty>No retrievals yet</Empty>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={topDocs} layout="vertical" margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis type="number" stroke="#94A3B8" fontSize={11} />
+                <CartesianGrid stroke={GRID} />
+                <XAxis type="number" stroke={AXIS} fontSize={11} tickLine={false} />
                 <YAxis
                   type="category"
                   dataKey="source"
-                  stroke="#94A3B8"
+                  stroke={AXIS}
                   fontSize={11}
                   width={120}
+                  tickLine={false}
                 />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Bar dataKey="count" fill="#3B82F6" radius={[0, 6, 6, 0]} />
+                <Bar dataKey="count" fill={ACCENT} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -122,26 +136,23 @@ export default function AnalyticsView({ sessions }: Props) {
           {allChunks.length === 0 ? (
             <Empty>Ask questions to populate this chart</Empty>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={histogram}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} />
-                <YAxis stroke="#94A3B8" fontSize={11} allowDecimals={false} />
+                <CartesianGrid stroke={GRID} />
+                <XAxis dataKey="label" stroke={AXIS} fontSize={11} tickLine={false} />
+                <YAxis stroke={AXIS} fontSize={11} allowDecimals={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Bar dataKey="count" fill="#A78BFA" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="count" fill={ACCENT} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </Card>
 
-        <Card title="Token usage (est.)">
-          <div className="grid h-[220px] grid-cols-2 gap-3">
+        <Card title="Token usage">
+          <div className="grid h-[200px] grid-cols-2 gap-3">
             <Stat label="Total messages" value={allMessages.length} />
             <Stat label="User questions" value={userMessages.length} />
-            <Stat
-              label="Tokens (rough est.)"
-              value={tokenEstimate.toLocaleString()}
-            />
+            <Stat label="Tokens (est.)" value={tokenEstimate.toLocaleString()} />
             <Stat label="Sessions" value={sessions.length} />
           </div>
         </Card>
@@ -152,8 +163,8 @@ export default function AnalyticsView({ sessions }: Props) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="glass rounded-2xl p-5">
-      <p className="mb-3 font-display text-sm font-semibold tracking-wide">{title}</p>
+    <div className="panel p-4">
+      <p className="mb-3 text-sm font-medium text-slate-200">{title}</p>
       {children}
     </div>
   );
@@ -161,7 +172,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid h-[220px] place-items-center text-xs text-slate-500">
+    <div className="grid h-[200px] place-items-center text-xs text-slate-500">
       {children}
     </div>
   );
@@ -169,11 +180,11 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="flex flex-col justify-center rounded-xl border border-white/5 bg-white/[0.02] p-3">
-      <span className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-        {label}
+    <div className="flex flex-col justify-center rounded-md border border-white/[0.06] bg-panel2 p-3">
+      <span className="text-[11px] text-slate-500">{label}</span>
+      <span className="mt-1 text-2xl font-semibold tabular-nums text-slate-100">
+        {value}
       </span>
-      <span className="mt-0.5 font-display text-2xl font-bold text-white">{value}</span>
     </div>
   );
 }

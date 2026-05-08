@@ -10,14 +10,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <Toaster
       position="bottom-right"
       theme="dark"
-      richColors
       closeButton
       toastOptions={{
         style: {
-          background: "rgba(13, 17, 23, 0.92)",
+          background: "#13161A",
           border: "1px solid rgba(255,255,255,0.08)",
           color: "#E2E8F0",
-          backdropFilter: "blur(12px)",
+          fontFamily: "DM Sans, sans-serif",
         },
       }}
     />

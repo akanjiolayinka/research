@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { ArrowUp, Paperclip, Square } from "lucide-react";
 import { useEffect, useRef } from "react";
 
@@ -40,30 +39,30 @@ export default function ChatInput({
   }
 
   return (
-    <div className="space-y-1.5">
-      <motion.div
-        whileFocus={{ scale: 1.005 }}
-        className="glass-strong glow-border rounded-2xl px-3 py-2.5 shadow-glow"
-      >
+    <div className="space-y-2">
+      <div className="rounded-lg border border-white/[0.08] bg-panel px-3 py-2 transition focus-within:border-accent/40">
         <textarea
           ref={taRef}
           rows={1}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ask anything about your knowledge base…"
+          placeholder="Ask about your knowledge base…"
           className="block w-full resize-none bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
-          style={{ lineHeight: `${LINE_HEIGHT}px`, maxHeight: MAX_ROWS * LINE_HEIGHT + 24 }}
+          style={{
+            lineHeight: `${LINE_HEIGHT}px`,
+            maxHeight: MAX_ROWS * LINE_HEIGHT + 24,
+          }}
           disabled={streaming}
         />
         <div className="mt-2 flex items-center justify-between">
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="btn-ghost text-xs"
+            className="btn-ghost h-7 px-2 text-xs"
             disabled={streaming}
           >
-            <Paperclip size={13} />
+            <Paperclip size={12} />
             Attach
           </button>
           <input
@@ -81,31 +80,28 @@ export default function ChatInput({
             <button
               type="button"
               onClick={onAbort}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/10"
+              className="btn-secondary h-7 px-2 text-xs"
             >
-              <Square size={11} fill="currentColor" />
+              <Square size={10} fill="currentColor" />
               Stop
             </button>
           ) : (
-            <motion.button
+            <button
               type="button"
               onClick={onSend}
               disabled={!value.trim()}
-              whileTap={{ scale: 0.94 }}
-              className="btn-primary px-3 py-1.5 text-xs"
+              className="btn-primary h-7 px-2 text-xs"
               aria-label="Send"
             >
               Send
-              <ArrowUp size={13} />
-            </motion.button>
+              <ArrowUp size={12} />
+            </button>
           )}
         </div>
-      </motion.div>
+      </div>
       <p className="text-center text-[11px] text-slate-500">
-        <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-[10px]">Enter</kbd> to send
-        ·{" "}
-        <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-[10px]">Shift + Enter</kbd>{" "}
-        for newline
+        <kbd className="rounded border border-white/[0.06] px-1 text-[10px]">Enter</kbd> to
+        send · <kbd className="rounded border border-white/[0.06] px-1 text-[10px]">Shift + Enter</kbd> for newline
       </p>
     </div>
   );

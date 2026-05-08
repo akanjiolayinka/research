@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -10,7 +9,6 @@ import {
   uid,
   type IngestedDoc,
 } from "../../lib/store";
-import Badge from "../UI/Badge";
 import DocumentCard from "./DocumentCard";
 import UploadZone from "./UploadZone";
 import URLIngestor, { type IngestStep } from "./URLIngestor";
@@ -64,18 +62,17 @@ export default function KnowledgeBaseView({
     persist([optimistic, ...docs]);
 
     try {
-      const result = await ingestFile(file, (loaded, total) =>
-        setProgress(loaded / total),
-      );
+      const result = await ingestFile(file, {
+        namespace,
+        onProgress: (loaded, total) => setProgress(loaded / total),
+      });
       persist([
-        {
-          ...optimistic,
-          chunks: result.chunks,
-          status: "indexed",
-        },
+        { ...optimistic, chunks: result.chunks, status: "indexed" },
         ...docs,
       ]);
-      toast.success(`Indexed ${result.source} (${result.chunks} chunks)`);
+      toast.success(`Indexed ${result.source}`, {
+        description: `${result.chunks} chunks`,
+      });
     } catch (err) {
       const e = humanize(err);
       persist([{ ...optimistic, status: "failed", error: e.detail }, ...docs]);
@@ -99,12 +96,11 @@ export default function KnowledgeBaseView({
     };
     persist([optimistic, ...docs]);
 
-    // visual step indicator (backend is one round trip)
     const stepTimer = setTimeout(() => setStep("chunking"), 600);
     const stepTimer2 = setTimeout(() => setStep("embedding"), 1400);
 
     try {
-      const result = await ingestUrl(url);
+      const result = await ingestUrl(url, namespace);
       clearTimeout(stepTimer);
       clearTimeout(stepTimer2);
       setStep("done");
@@ -112,7 +108,9 @@ export default function KnowledgeBaseView({
         { ...optimistic, chunks: result.chunks, status: "indexed", name: result.source },
         ...docs,
       ]);
-      toast.success(`Indexed ${result.source} (${result.chunks} chunks)`);
+      toast.success(`Indexed ${result.source}`, {
+        description: `${result.chunks} chunks`,
+      });
     } catch (err) {
       clearTimeout(stepTimer);
       clearTimeout(stepTimer2);
@@ -121,44 +119,42 @@ export default function KnowledgeBaseView({
       persist([{ ...optimistic, status: "failed", error: e.detail }, ...docs]);
       toast.error(e.title, { description: e.detail });
     } finally {
-      setTimeout(() => setStep("idle"), 1500);
+      setTimeout(() => setStep("idle"), 1200);
     }
   }
 
   function deleteDoc(id: string) {
     persist(docs.filter((d) => d.id !== id));
-    toast.message("Removed from knowledge base", {
-      description: "Vectors remain in Pinecone until you reset the index.",
+    toast.message("Removed from list", {
+      description: "Vectors remain in Pinecone until the index is reset.",
     });
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-6 overflow-y-auto px-6 py-6">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-6 overflow-y-auto px-6 py-6">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
-            Namespace
-          </span>
+          <span className="text-xs font-medium text-slate-500">Namespace</span>
           <select
             value={namespace}
             onChange={(e) => setNamespace(e.target.value)}
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm outline-none focus:border-violet-400"
+            className="input-base h-8 w-auto py-0 pr-8 text-xs"
           >
             {[...new Set([namespace, "default", "personal", "work"])].map((ns) => (
-              <option key={ns} value={ns} className="bg-ink-900">
+              <option key={ns} value={ns} className="bg-panel">
                 {ns}
               </option>
             ))}
           </select>
-          <Badge tone="electric">{visible.length} docs</Badge>
+          <span className="text-xs text-slate-500">{visible.length} indexed</span>
         </div>
-        <div className="ml-auto flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5">
-          <Search size={14} className="text-slate-500" />
+        <div className="ml-auto flex items-center gap-2 rounded-md border border-white/[0.08] bg-panel2 px-3 py-1.5">
+          <Search size={13} className="text-slate-500" />
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search documents…"
-            className="w-56 bg-transparent text-sm outline-none placeholder:text-slate-500"
+            placeholder="Search documents"
+            className="w-48 bg-transparent text-xs outline-none placeholder:text-slate-500"
           />
         </div>
       </div>
@@ -167,20 +163,12 @@ export default function KnowledgeBaseView({
       <URLIngestor onIngest={handleUrl} step={step} />
 
       <div>
-        <div className="mb-3 flex items-center justify-between">
-          <p className="font-display text-sm font-semibold tracking-wide">
-            Documents
-          </p>
-        </div>
+        <p className="mb-3 text-xs font-medium text-slate-500">Documents</p>
         {visible.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-10 text-center text-sm text-slate-500"
-          >
-            Nothing indexed yet in <code className="text-violet-300">{namespace}</code>.
-            Drop a file above or paste a URL.
-          </motion.div>
+          <div className="rounded-lg border border-dashed border-white/[0.08] p-8 text-center text-xs text-slate-500">
+            No documents in <span className="text-slate-300">{namespace}</span>. Upload a
+            file or paste a URL above.
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((d) => (

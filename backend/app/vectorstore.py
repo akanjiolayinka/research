@@ -28,20 +28,34 @@ def get_index():
     return pc.Index(settings.pinecone_index)
 
 
-def upsert(items: list[dict[str, Any]], batch_size: int = 100) -> int:
+def upsert(
+    items: list[dict[str, Any]],
+    batch_size: int = 100,
+    namespace: str | None = None,
+) -> int:
     if not items:
         return 0
     index = get_index()
     total = 0
+    kwargs: dict[str, Any] = {}
+    if namespace:
+        kwargs["namespace"] = namespace
     for start in range(0, len(items), batch_size):
         batch = items[start : start + batch_size]
-        index.upsert(vectors=batch)
+        index.upsert(vectors=batch, **kwargs)
         total += len(batch)
     return total
 
 
-def query(vector: list[float], top_k: int) -> list[dict[str, Any]]:
-    res = get_index().query(vector=vector, top_k=top_k, include_metadata=True)
+def query(
+    vector: list[float],
+    top_k: int,
+    namespace: str | None = None,
+) -> list[dict[str, Any]]:
+    kwargs: dict[str, Any] = {"vector": vector, "top_k": top_k, "include_metadata": True}
+    if namespace:
+        kwargs["namespace"] = namespace
+    res = get_index().query(**kwargs)
     matches = res.get("matches", []) if isinstance(res, dict) else res.matches
     out: list[dict[str, Any]] = []
     for m in matches:

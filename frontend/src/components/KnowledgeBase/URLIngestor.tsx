@@ -1,5 +1,4 @@
-import { motion } from "framer-motion";
-import { Globe, Link2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { useState } from "react";
 
 export type IngestStep = "idle" | "fetching" | "chunking" | "embedding" | "done" | "error";
@@ -9,16 +8,13 @@ interface Props {
   step: IngestStep;
 }
 
-const stepLabels: Record<IngestStep, string> = {
-  idle: "",
-  fetching: "Fetching page",
-  chunking: "Chunking text",
-  embedding: "Embedding & upserting",
-  done: "Done",
-  error: "Failed",
+const stepLabels: Record<Exclude<IngestStep, "idle" | "done" | "error">, string> = {
+  fetching: "Fetching",
+  chunking: "Chunking",
+  embedding: "Embedding",
 };
 
-const order: IngestStep[] = ["fetching", "chunking", "embedding", "done"];
+const order: Array<keyof typeof stepLabels> = ["fetching", "chunking", "embedding"];
 
 export default function URLIngestor({ onIngest, step }: Props) {
   const [url, setUrl] = useState("");
@@ -31,12 +27,10 @@ export default function URLIngestor({ onIngest, step }: Props) {
   }
 
   return (
-    <div className="glass rounded-2xl p-4">
-      <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-        <Globe size={12} /> Ingest from URL
-      </p>
+    <div className="panel p-4">
+      <p className="mb-3 text-xs font-medium text-slate-400">Ingest from URL</p>
       <div className="flex gap-2">
-        <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 focus-within:border-violet-400/50">
+        <div className="flex flex-1 items-center gap-2 rounded-md border border-white/[0.08] bg-panel2 px-3 py-2 transition focus-within:border-accent/40">
           <Link2 size={14} className="text-slate-500" />
           <input
             value={url}
@@ -51,42 +45,43 @@ export default function URLIngestor({ onIngest, step }: Props) {
           type="button"
           onClick={submit}
           disabled={busy || !url.trim()}
-          className="btn-primary"
+          className="btn-primary text-xs"
         >
-          {busy ? "Ingesting…" : "Ingest"}
+          {busy ? "Ingesting" : "Ingest"}
         </button>
       </div>
 
       {step !== "idle" && (
-        <div className="mt-4 flex items-center gap-1.5">
-          {order.map((s, i) => {
-            const reached = order.indexOf(step) >= i || step === "done";
+        <div className="mt-4 flex items-center gap-2">
+          {order.map((s) => {
+            const reachedIdx = step === "done" ? order.length : order.indexOf(step as typeof s);
+            const myIdx = order.indexOf(s);
+            const reached = reachedIdx >= myIdx;
             const active = step === s;
+            const failed = step === "error" && active;
             return (
-              <div key={s} className="flex flex-1 items-center gap-1.5">
-                <motion.div
-                  animate={{ scale: active ? 1.05 : 1 }}
+              <div
+                key={s}
+                className={
+                  "flex flex-1 items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] " +
+                  (failed
+                    ? "border-rose-500/30 text-rose-300"
+                    : reached
+                      ? "border-white/[0.08] text-slate-300"
+                      : "border-white/[0.05] text-slate-500")
+                }
+              >
+                <span
                   className={
-                    "flex flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11px] " +
-                    (step === "error" && active
-                      ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
+                    "h-1.5 w-1.5 rounded-full " +
+                    (active && !failed
+                      ? "animate-pulse bg-accent"
                       : reached
-                        ? "border-violet-400/40 bg-violet-500/10 text-violet-200"
-                        : "border-white/10 bg-white/[0.02] text-slate-500")
+                        ? "bg-slate-500"
+                        : "bg-slate-700")
                   }
-                >
-                  <span
-                    className={
-                      "h-1.5 w-1.5 rounded-full " +
-                      (active && step !== "error"
-                        ? "animate-pulse bg-violet-300"
-                        : reached
-                          ? "bg-violet-400"
-                          : "bg-slate-600")
-                    }
-                  />
-                  {stepLabels[s]}
-                </motion.div>
+                />
+                {stepLabels[s]}
               </div>
             );
           })}

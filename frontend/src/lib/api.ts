@@ -44,19 +44,25 @@ export async function health(): Promise<{ status: string }> {
 
 export async function ingestFile(
   file: File,
-  onProgress?: (loaded: number, total: number) => void,
+  opts?: {
+    namespace?: string;
+    onProgress?: (loaded: number, total: number) => void;
+  },
 ): Promise<IngestResult> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_URL}/ingest/file`);
+    const url = opts?.namespace
+      ? `${API_URL}/ingest/file?namespace=${encodeURIComponent(opts.namespace)}`
+      : `${API_URL}/ingest/file`;
+    xhr.open("POST", url);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total);
+      if (e.lengthComputable && opts?.onProgress) opts.onProgress(e.loaded, e.total);
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           resolve(JSON.parse(xhr.responseText));
-        } catch (e) {
+        } catch {
           reject(new Error("Malformed server response"));
         }
       } else {
@@ -71,11 +77,11 @@ export async function ingestFile(
   });
 }
 
-export async function ingestUrl(url: string): Promise<IngestResult> {
+export async function ingestUrl(url: string, namespace?: string): Promise<IngestResult> {
   const res = await fetch(`${API_URL}/ingest/url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ url, namespace }),
   });
   if (!res.ok) throw new Error(await readError(res));
   return res.json();

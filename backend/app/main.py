@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
+import sys
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -13,7 +16,46 @@ from .config import get_settings
 from .ingest import ingest_source
 from .rag import answer_stream
 
-app = FastAPI(title="RAG Chatbot API", version="0.1.0")
+logger = logging.getLogger("rag")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+
+def _check_env() -> list[str]:
+    settings = get_settings()
+    missing: list[str] = []
+    if not settings.groq_api_key:
+        missing.append("GROQ_API_KEY")
+    if not settings.pinecone_api_key:
+        missing.append("PINECONE_API_KEY")
+    return missing
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    missing = _check_env()
+    if missing:
+        msg = (
+            "\n\n  Missing required environment variables: "
+            + ", ".join(missing)
+            + "\n  Copy backend/.env.example to backend/.env and fill in the keys.\n"
+        )
+        logger.error(msg)
+        # Don't crash — let /health surface the problem and let unrelated tooling start.
+    else:
+        try:
+            from . import embeddings, vectorstore
+
+            logger.info("Loading embedding model %s …", get_settings().embed_model)
+            embeddings._model()  # noqa: SLF001 — warm cache
+            logger.info("Initializing Pinecone index %s …", get_settings().pinecone_index)
+            vectorstore.get_index()
+            logger.info("Backend ready.")
+        except Exception as exc:  # pragma: no cover
+            logger.exception("Startup warm-up failed: %s", exc)
+    yield
+
+
+app = FastAPI(title="RAG Studio API", version="0.2.0", lifespan=lifespan)
 
 settings = get_settings()
 app.add_middleware(
@@ -28,27 +70,39 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     top_k: int | None = None
+    namespace: str | None = None
 
 
 class IngestUrlRequest(BaseModel):
     url: str
+    namespace: str | None = None
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    missing = _check_env()
+    return {
+        "status": "ok" if not missing else "degraded",
+        "missing_env": missing,
+        "model": settings.groq_model,
+        "embed_model": settings.embed_model,
+        "pinecone_index": settings.pinecone_index,
+    }
 
 
 @app.post("/ingest/url")
 def ingest_url(payload: IngestUrlRequest) -> dict:
     try:
-        return ingest_source(payload.url)
+        return ingest_source(payload.url, namespace=payload.namespace)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/ingest/file")
-async def ingest_file(file: UploadFile = File(...)) -> dict:
+async def ingest_file(
+    file: UploadFile = File(...),
+    namespace: str | None = None,
+) -> dict:
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in {".pdf", ".md", ".markdown", ".txt", ".rst"}:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {suffix}")
@@ -57,7 +111,7 @@ async def ingest_file(file: UploadFile = File(...)) -> dict:
         tmp.write(await file.read())
         tmp_path = Path(tmp.name)
     try:
-        result = ingest_source(tmp_path)
+        result = ingest_source(tmp_path, namespace=namespace)
         result["source"] = file.filename or result["source"]
         return result
     except Exception as exc:
@@ -71,11 +125,36 @@ def chat_stream_endpoint(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Empty message")
 
+    missing = _check_env()
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Backend is missing required environment variables: "
+                + ", ".join(missing)
+                + ". See backend/.env.example."
+            ),
+        )
+
     def event_source():
         try:
-            for event in answer_stream(req.message, top_k=req.top_k):
+            for event in answer_stream(
+                req.message, top_k=req.top_k, namespace=req.namespace
+            ):
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as exc:  # surface error to client
+            logger.exception("chat_stream failed: %s", exc)
             yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
 
-    return StreamingResponse(event_source(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+# Allow `python -m app.main` as a one-shot dev entrypoint
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload="--reload" in sys.argv)

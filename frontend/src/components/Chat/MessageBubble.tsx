@@ -1,6 +1,5 @@
 import clsx from "clsx";
-import { motion } from "framer-motion";
-import { Check, Copy, Sparkles, ThumbsDown, ThumbsUp, User } from "lucide-react";
+import { Check, Copy, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -29,101 +28,84 @@ export default function MessageBubble({ message, onRetry }: Props) {
     }
   }
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 28 }}
-      className={clsx("flex gap-3", isUser ? "justify-end" : "justify-start")}
-    >
-      {!isUser && (
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-electric shadow-glow-sm">
-          <Sparkles size={14} className="text-white" />
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[80%] rounded-md bg-panel2 px-3 py-2 text-sm text-slate-100">
+          <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
-      )}
-      <div
-        className={clsx(
-          "group relative max-w-[80%] rounded-2xl px-4 py-3",
-          isUser
-            ? "rounded-br-md bg-gradient-to-br from-electric-600 to-violet-600 text-white shadow-glow-sm"
-            : "rounded-bl-md glass-strong",
-        )}
-      >
-        {message.error ? (
-          <ErrorBanner
-            title={message.error.title}
-            detail={message.error.detail}
-            onRetry={onRetry}
-          />
-        ) : message.pending && !message.content ? (
-          <TypingIndicator />
-        ) : (
-          <>
-            <div
-              className={clsx(
-                "markdown",
-                !isUser && "text-slate-100",
-                message.pending && !isUser && "stream-caret",
-              )}
-            >
-              {isUser ? (
-                <p className="whitespace-pre-wrap">{message.content}</p>
-              ) : (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {message.content}
-                </ReactMarkdown>
-              )}
-            </div>
-            {!isUser && message.sources && (
-              <SourcesAccordion sources={message.sources} chunks={message.chunks} />
-            )}
-          </>
-        )}
-
-        {!isUser && !message.pending && !message.error && (
-          <div className="absolute -bottom-7 left-1 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-            <button
-              type="button"
-              onClick={copy}
-              className="rounded-lg bg-white/5 p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
-              aria-label="Copy"
-            >
-              {copied ? <Check size={12} /> : <Copy size={12} />}
-            </button>
-            <button
-              type="button"
-              onClick={() => setFeedback(feedback === "up" ? null : "up")}
-              className={clsx(
-                "rounded-lg p-1.5 transition",
-                feedback === "up"
-                  ? "bg-emerald-500/20 text-emerald-300"
-                  : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white",
-              )}
-              aria-label="Good response"
-            >
-              <ThumbsUp size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setFeedback(feedback === "down" ? null : "down")}
-              className={clsx(
-                "rounded-lg p-1.5 transition",
-                feedback === "down"
-                  ? "bg-rose-500/20 text-rose-300"
-                  : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white",
-              )}
-              aria-label="Bad response"
-            >
-              <ThumbsDown size={12} />
-            </button>
-          </div>
-        )}
       </div>
-      {isUser && (
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.05]">
-          <User size={14} className="text-slate-300" />
+    );
+  }
+
+  return (
+    <div className="group flex flex-col gap-2">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        Assistant
+      </div>
+      {message.error ? (
+        <ErrorBanner
+          title={message.error.title}
+          detail={message.error.detail}
+          onRetry={onRetry}
+        />
+      ) : message.pending && !message.content ? (
+        <TypingIndicator />
+      ) : (
+        <>
+          <div
+            className={clsx(
+              "markdown text-slate-200",
+              message.pending && "stream-caret",
+            )}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+          {message.sources && (
+            <SourcesAccordion sources={message.sources} chunks={message.chunks} />
+          )}
+        </>
+      )}
+
+      {!message.pending && !message.error && (
+        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={copy}
+            className="btn-ghost h-7 w-7 p-0"
+            aria-label="Copy"
+            title="Copy"
+          >
+            {copied ? <Check size={12} /> : <Copy size={12} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFeedback(feedback === "up" ? null : "up")}
+            className={clsx(
+              "btn-ghost h-7 w-7 p-0",
+              feedback === "up" && "text-emerald-400",
+            )}
+            aria-label="Good response"
+            title="Good"
+          >
+            <ThumbsUp size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFeedback(feedback === "down" ? null : "down")}
+            className={clsx(
+              "btn-ghost h-7 w-7 p-0",
+              feedback === "down" && "text-rose-400",
+            )}
+            aria-label="Bad response"
+            title="Bad"
+          >
+            <ThumbsDown size={12} />
+          </button>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

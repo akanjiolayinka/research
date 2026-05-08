@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Iterable
 
 import httpx
-import tiktoken
 import trafilatura
 from pypdf import PdfReader
 
@@ -13,7 +12,10 @@ from .config import get_settings
 from .embeddings import embed
 from .vectorstore import upsert
 
-_ENCODER = tiktoken.get_encoding("cl100k_base")
+# Approximation: tokenize by treating ~4 characters as one token. This avoids
+# a network download at startup (tiktoken fetches BPE tables on first use) and
+# is plenty accurate for retrieval chunking.
+CHARS_PER_TOKEN = 4
 
 
 def _read_pdf(path: Path) -> str:
@@ -50,20 +52,24 @@ def load_source(source: str | Path) -> tuple[str, str]:
 
 
 def chunk_text(text: str, chunk_size: int | None = None, overlap: int | None = None) -> list[str]:
+    """Split text into overlapping windows. Sizes are in approximate tokens
+    (1 token ≈ 4 characters) so the produced chunks land near the configured
+    CHUNK_SIZE without needing an encoder download at startup."""
     settings = get_settings()
     chunk_size = chunk_size or settings.chunk_size
     overlap = overlap or settings.chunk_overlap
-    tokens = _ENCODER.encode(text)
-    if not tokens:
+    if not text:
         return []
+    char_size = chunk_size * CHARS_PER_TOKEN
+    char_overlap = overlap * CHARS_PER_TOKEN
+    step = max(1, char_size - char_overlap)
     chunks: list[str] = []
-    step = max(1, chunk_size - overlap)
-    for start in range(0, len(tokens), step):
-        window = tokens[start : start + chunk_size]
+    for start in range(0, len(text), step):
+        window = text[start : start + char_size]
         if not window:
             break
-        chunks.append(_ENCODER.decode(window))
-        if start + chunk_size >= len(tokens):
+        chunks.append(window)
+        if start + char_size >= len(text):
             break
     return [c.strip() for c in chunks if c.strip()]
 
@@ -73,7 +79,7 @@ def _chunk_id(source_id: str, idx: int) -> str:
     return f"{source_id}-{digest[:16]}"
 
 
-def ingest_source(source: str | Path) -> dict:
+def ingest_source(source: str | Path, namespace: str | None = None) -> dict:
     source_id, text = load_source(source)
     chunks = chunk_text(text)
     if not chunks:
@@ -89,11 +95,11 @@ def ingest_source(source: str | Path) -> dict:
                 "metadata": {"source": source_id, "chunk_idx": idx, "text": chunk},
             }
         )
-    upserted = upsert(items)
+    upserted = upsert(items, namespace=namespace)
     return {"source": source_id, "chunks": len(chunks), "upserted": upserted}
 
 
-def ingest_text(source_id: str, text: str) -> dict:
+def ingest_text(source_id: str, text: str, namespace: str | None = None) -> dict:
     chunks = chunk_text(text)
     if not chunks:
         return {"source": source_id, "chunks": 0, "upserted": 0}
@@ -107,9 +113,9 @@ def ingest_text(source_id: str, text: str) -> dict:
                 "metadata": {"source": source_id, "chunk_idx": idx, "text": chunk},
             }
         )
-    upserted = upsert(items)
+    upserted = upsert(items, namespace=namespace)
     return {"source": source_id, "chunks": len(chunks), "upserted": upserted}
 
 
-def ingest_many(sources: Iterable[str | Path]) -> list[dict]:
-    return [ingest_source(s) for s in sources]
+def ingest_many(sources: Iterable[str | Path], namespace: str | None = None) -> list[dict]:
+    return [ingest_source(s, namespace=namespace) for s in sources]

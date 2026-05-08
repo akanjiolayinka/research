@@ -24,10 +24,14 @@ def _format_context(matches: list[dict]) -> str:
     return "\n\n---\n\n".join(lines)
 
 
-def retrieve(question: str, top_k: int | None = None) -> list[dict]:
+def retrieve(
+    question: str,
+    top_k: int | None = None,
+    namespace: str | None = None,
+) -> list[dict]:
     k = top_k or get_settings().top_k
     vec = embed_one(question)
-    return query(vec, top_k=k)
+    return query(vec, top_k=k, namespace=namespace)
 
 
 def build_messages(question: str, matches: list[dict]) -> list[dict]:
@@ -48,10 +52,29 @@ def unique_sources(matches: list[dict]) -> list[str]:
     return seen
 
 
-def answer_stream(question: str, top_k: int | None = None) -> Iterator[dict]:
-    matches = retrieve(question, top_k=top_k)
+def chunks_payload(matches: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for m in matches:
+        meta = m.get("metadata") or {}
+        out.append(
+            {
+                "source": meta.get("source", "unknown"),
+                "chunk_idx": int(meta.get("chunk_idx", 0)),
+                "score": float(m.get("score", 0.0)),
+                "text": meta.get("text", ""),
+            }
+        )
+    return out
+
+
+def answer_stream(
+    question: str,
+    top_k: int | None = None,
+    namespace: str | None = None,
+) -> Iterator[dict]:
+    matches = retrieve(question, top_k=top_k, namespace=namespace)
     sources = unique_sources(matches)
-    yield {"type": "sources", "sources": sources}
+    yield {"type": "sources", "sources": sources, "chunks": chunks_payload(matches)}
     messages = build_messages(question, matches)
     for token in chat_stream(messages):
         yield {"type": "token", "text": token}

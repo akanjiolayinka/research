@@ -1,5 +1,4 @@
-import { motion } from "framer-motion";
-import { CloudUpload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { useRef, useState } from "react";
 
 interface Props {
@@ -18,7 +17,7 @@ export default function UploadZone({ onFile, busy, progress }: Props) {
   }
 
   return (
-    <motion.div
+    <div
       onDragEnter={(e) => {
         e.preventDefault();
         setDrag(true);
@@ -33,45 +32,27 @@ export default function UploadZone({ onFile, busy, progress }: Props) {
         setDrag(false);
         handleFiles(e.dataTransfer.files);
       }}
-      animate={drag ? { scale: 1.01 } : { scale: 1 }}
       className={
-        "relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-10 text-center transition " +
+        "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center transition " +
         (drag
-          ? "border-violet-400 bg-violet-500/10 shadow-glow"
-          : "border-white/15 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.05]")
+          ? "border-accent/60 bg-accent/[0.04]"
+          : "border-white/[0.10] bg-panel")
       }
     >
-      {drag && (
-        <motion.div
-          className="pointer-events-none absolute inset-0 rounded-2xl"
-          animate={{
-            boxShadow: [
-              "0 0 0 0 rgba(124,58,237,0)",
-              "0 0 0 8px rgba(124,58,237,0.15)",
-              "0 0 0 0 rgba(124,58,237,0)",
-            ],
-          }}
-          transition={{ duration: 1.6, repeat: Infinity }}
-        />
-      )}
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-electric shadow-glow-sm">
-        <CloudUpload size={22} className="text-white" />
-      </div>
+      <Upload size={20} className="text-slate-500" />
       <div>
-        <p className="font-display text-base font-semibold">
-          Drop a file to ingest
-        </p>
-        <p className="mt-1 text-xs text-slate-400">
-          PDF, Markdown, or plain text · Max ~25MB
+        <p className="text-sm font-medium text-slate-200">Drop a file to ingest</p>
+        <p className="mt-1 text-xs text-slate-500">
+          PDF, Markdown, or plain text · up to ~25MB
         </p>
       </div>
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
         disabled={busy}
-        className="btn-primary"
+        className="btn-secondary text-xs"
       >
-        Browse files
+        Choose file
       </button>
       <input
         ref={fileRef}
@@ -82,21 +63,18 @@ export default function UploadZone({ onFile, busy, progress }: Props) {
       />
 
       {busy && (
-        <div className="mt-3 w-full max-w-sm">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-            <motion.div
-              className="h-full bg-gradient-electric"
-              animate={{ width: `${Math.max(8, progress * 100)}%` }}
-              transition={{ ease: "easeOut", duration: 0.2 }}
+        <div className="mt-2 w-full max-w-sm">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className="h-full bg-accent transition-[width] duration-200"
+              style={{ width: `${Math.max(8, progress * 100)}%` }}
             />
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-400">
-            {progress < 1
-              ? `Uploading… ${(progress * 100).toFixed(0)}%`
-              : "Indexing…"}
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            {progress < 1 ? `Uploading ${(progress * 100).toFixed(0)}%` : "Indexing"}
           </p>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

@@ -1,25 +1,12 @@
-import { animate, useMotionValue, useTransform, motion } from "framer-motion";
-import { useEffect } from "react";
-
+// Decorative number rolls were dropped in the design pass; kept as a thin
+// passthrough so existing imports still work, but values render statically now.
 export default function AnimatedCounter({
   value,
-  format = (n) => Math.round(n).toLocaleString(),
-  duration = 1.2,
+  format = (n: number) => Math.round(n).toLocaleString(),
 }: {
   value: number;
   format?: (n: number) => string;
   duration?: number;
 }) {
-  const motionVal = useMotionValue(0);
-  const display = useTransform(motionVal, (n) => format(n));
-
-  useEffect(() => {
-    const controls = animate(motionVal, value, {
-      duration,
-      ease: "easeOut",
-    });
-    return controls.stop;
-  }, [value, duration, motionVal]);
-
-  return <motion.span>{display}</motion.span>;
+  return <span>{format(value)}</span>;
 }

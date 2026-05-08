@@ -1,5 +1,3 @@
-import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "../../lib/store";
 import MessageBubble from "./MessageBubble";
@@ -26,34 +24,24 @@ export default function ChatView({
   if (messages.length === 0) {
     return (
       <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center px-6 text-center">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-electric shadow-glow"
-        >
-          <Sparkles size={22} className="text-white" />
-        </motion.div>
-        <h2 className="font-display text-2xl font-bold tracking-tight">
-          What do you want to know?
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-100">
+          What would you like to know?
         </h2>
         <p className="mt-2 max-w-md text-sm text-slate-400">
-          Ask grounded questions about the documents in your knowledge base. Answers
-          stream in with citations to the exact source chunks.
+          Ask questions grounded in your indexed documents. Citations and the source
+          chunks used appear with every answer.
         </p>
         {emptyExamples.length > 0 && (
-          <div className="mt-7 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
-            {emptyExamples.map((q, i) => (
-              <motion.button
+          <div className="mt-8 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+            {emptyExamples.map((q) => (
+              <button
                 type="button"
-                key={i}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.05 }}
+                key={q}
                 onClick={() => onPickExample?.(q)}
-                className="glass rounded-xl px-3 py-2.5 text-left text-xs text-slate-300 transition hover:border-violet-400/40 hover:bg-white/[0.06]"
+                className="rounded-md border border-white/[0.06] bg-panel px-3 py-2 text-left text-xs text-slate-400 transition hover:border-white/[0.12] hover:text-slate-200"
               >
                 {q}
-              </motion.button>
+              </button>
             ))}
           </div>
         )}
@@ -70,7 +58,6 @@ export default function ChatView({
           onRetry={
             m.error && i === messages.length - 1
               ? () => {
-                  // retry the previous user message
                   const prev = messages[i - 1];
                   if (prev?.role === "user") onRetry(m.id);
                 }

@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { File, FileText, Globe, RefreshCw, Trash2, type LucideIcon } from "lucide-react";
 import type { IngestedDoc } from "../../lib/store";
 import Badge from "../UI/Badge";
@@ -21,19 +20,11 @@ export default function DocumentCard({ doc, onDelete, onReindex }: Props) {
   const date = new Date(doc.ingestedAt);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      className="group relative flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-violet-400/40"
-    >
+    <div className="group flex flex-col gap-3 rounded-lg border border-white/[0.06] bg-panel p-4 transition hover:border-white/[0.12]">
       <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-electric-500/20 to-violet-500/20 text-violet-300">
-          <Icon size={18} />
-        </div>
+        <Icon size={16} className="mt-0.5 shrink-0 text-slate-500" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-slate-100" title={doc.name}>
+          <p className="truncate text-sm font-medium text-slate-200" title={doc.name}>
             {doc.name}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">
@@ -67,8 +58,9 @@ export default function DocumentCard({ doc, onDelete, onReindex }: Props) {
             <button
               type="button"
               onClick={() => onReindex(doc.id)}
-              className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
+              className="btn-ghost h-7 w-7 p-0"
               aria-label="Re-index"
+              title="Re-index"
             >
               <RefreshCw size={12} />
             </button>
@@ -76,13 +68,14 @@ export default function DocumentCard({ doc, onDelete, onReindex }: Props) {
           <button
             type="button"
             onClick={() => onDelete(doc.id)}
-            className="rounded-lg bg-white/5 p-1.5 text-rose-300 hover:bg-rose-500/20"
+            className="btn-ghost h-7 w-7 p-0 hover:text-rose-400"
             aria-label="Delete"
+            title="Delete"
           >
             <Trash2 size={12} />
           </button>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
