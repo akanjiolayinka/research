@@ -17,6 +17,14 @@ function scoreColor(score: number) {
   return "text-rose-400";
 }
 
+function rerankColor(score: number) {
+  // cross-encoder logits are roughly in [-10, 10]; positive = relevant
+  if (score >= 5) return "text-emerald-400";
+  if (score >= 1) return "text-slate-300";
+  if (score >= 0.1) return "text-amber-400";
+  return "text-rose-400";
+}
+
 export default function RightDrawer({ open, onClose, chunks, sources }: Props) {
   const [showWhy, setShowWhy] = useState(false);
   const visibleChunks =
@@ -71,11 +79,24 @@ export default function RightDrawer({ open, onClose, chunks, sources }: Props) {
                         <FileText size={12} className="shrink-0 text-slate-500" />
                         <span className="truncate">{c.source}</span>
                       </div>
-                      {c.score > 0 && (
-                        <span className={`font-mono text-[11px] ${scoreColor(c.score)}`}>
-                          {c.score.toFixed(2)}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 font-mono text-[11px] tabular-nums">
+                        {c.score > 0 && (
+                          <span
+                            className={scoreColor(c.score)}
+                            title="Vector cosine similarity"
+                          >
+                            sim {c.score.toFixed(2)}
+                          </span>
+                        )}
+                        {c.rerank_score !== undefined && (
+                          <span
+                            className={rerankColor(c.rerank_score)}
+                            title="Cross-encoder rerank score"
+                          >
+                            rr {c.rerank_score.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="text-[11px] text-slate-500">Chunk #{c.chunk_idx}</p>
                     <p className="mt-2 line-clamp-6 text-xs leading-relaxed text-slate-300">
@@ -98,9 +119,12 @@ export default function RightDrawer({ open, onClose, chunks, sources }: Props) {
                 {showWhy && (
                   <p className="rounded-md border border-white/[0.06] bg-panel/60 p-3 text-[11px] leading-relaxed text-slate-400">
                     Your question is embedded with all-MiniLM-L6-v2, the top-K most
-                    similar chunks are retrieved from Pinecone by cosine similarity, and
-                    Llama 3.3 70B on Groq generates an answer constrained to that
-                    context. Higher scores mean more relevant chunks.
+                    similar chunks are pulled from Pinecone by cosine similarity (
+                    <span className="font-mono">sim</span>), then a cross-encoder
+                    reranks them and the top {`{TOP_K_RERANK}`} most relevant survive (
+                    <span className="font-mono">rr</span>). If the best{" "}
+                    <span className="font-mono">rr</span> falls below the configured
+                    threshold, the answer step is skipped to avoid hallucination.
                   </p>
                 )}
               </div>

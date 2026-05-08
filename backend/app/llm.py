@@ -25,3 +25,16 @@ def chat_stream(messages: list[dict], temperature: float = 0.2) -> Iterator[str]
         delta = event.choices[0].delta.content if event.choices else None
         if delta:
             yield delta
+
+
+def chat_once(messages: list[dict], temperature: float = 0.0, max_tokens: int = 256) -> str:
+    """Single non-streaming completion. Used by the query-rewrite step."""
+    settings = get_settings()
+    res = _client().chat.completions.create(
+        model=settings.groq_model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        stream=False,
+    )
+    return res.choices[0].message.content or ""

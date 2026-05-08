@@ -4,6 +4,7 @@ import json
 import logging
 import sys
 import tempfile
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -40,14 +41,16 @@ async def lifespan(_app: FastAPI):
             + "\n  Copy backend/.env.example to backend/.env and fill in the keys.\n"
         )
         logger.error(msg)
-        # Don't crash — let /health surface the problem and let unrelated tooling start.
     else:
         try:
-            from . import embeddings, vectorstore
+            from . import embeddings, reranker, vectorstore
 
-            logger.info("Loading embedding model %s …", get_settings().embed_model)
-            embeddings._model()  # noqa: SLF001 — warm cache
-            logger.info("Initializing Pinecone index %s …", get_settings().pinecone_index)
+            settings = get_settings()
+            logger.info("Loading embedding model %s …", settings.embed_model)
+            embeddings._model()  # noqa: SLF001
+            logger.info("Loading reranker model %s …", settings.rerank_model)
+            reranker._model()  # noqa: SLF001
+            logger.info("Initializing Pinecone index %s …", settings.pinecone_index)
             vectorstore.get_index()
             logger.info("Backend ready.")
         except Exception as exc:  # pragma: no cover
@@ -55,7 +58,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="RAG Studio API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="RAG Studio API", version="0.3.0", lifespan=lifespan)
 
 settings = get_settings()
 app.add_middleware(
@@ -69,6 +72,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: str | None = None
     top_k: int | None = None
     namespace: str | None = None
 
@@ -86,7 +90,12 @@ def health() -> dict:
         "missing_env": missing,
         "model": settings.groq_model,
         "embed_model": settings.embed_model,
+        "rerank_model": settings.rerank_model,
         "pinecone_index": settings.pinecone_index,
+        "conversation_window": settings.conversation_window,
+        "top_k": settings.top_k,
+        "top_k_rerank": settings.top_k_rerank,
+        "min_rerank_score": settings.min_rerank_score,
     }
 
 
@@ -136,13 +145,21 @@ def chat_stream_endpoint(req: ChatRequest):
             ),
         )
 
+    session_id = req.session_id or uuid.uuid4().hex
+
     def event_source():
+        # Emit the (possibly server-generated) session id first so the client
+        # can persist it for subsequent turns.
+        yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
         try:
             for event in answer_stream(
-                req.message, top_k=req.top_k, namespace=req.namespace
+                req.message,
+                session_id=session_id,
+                top_k=req.top_k,
+                namespace=req.namespace,
             ):
                 yield f"data: {json.dumps(event)}\n\n"
-        except Exception as exc:  # surface error to client
+        except Exception as exc:
             logger.exception("chat_stream failed: %s", exc)
             yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
 
@@ -153,7 +170,6 @@ def chat_stream_endpoint(req: ChatRequest):
     )
 
 
-# Allow `python -m app.main` as a one-shot dev entrypoint
 if __name__ == "__main__":
     import uvicorn
 

@@ -63,3 +63,20 @@ def query(
         score = m["score"] if isinstance(m, dict) else m.score
         out.append({"score": score, "metadata": meta or {}})
     return out
+
+
+def existing_ids(ids: list[str], namespace: str | None = None) -> set[str]:
+    """Return the subset of `ids` that already have vectors in Pinecone."""
+    if not ids:
+        return set()
+    kwargs: dict[str, Any] = {"ids": ids}
+    if namespace:
+        kwargs["namespace"] = namespace
+    try:
+        res = get_index().fetch(**kwargs)
+    except Exception:
+        # If fetch fails (e.g. transient network error), assume nothing exists
+        # so dedup degrades to "always upsert" rather than blocking ingest.
+        return set()
+    vectors = res.get("vectors", {}) if isinstance(res, dict) else getattr(res, "vectors", {})
+    return set(vectors.keys()) if vectors else set()

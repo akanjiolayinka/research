@@ -20,9 +20,17 @@ class Settings(BaseSettings):
     )
     embed_dim: int = 384
 
-    chunk_size: int = Field(default=800, alias="CHUNK_SIZE")
-    chunk_overlap: int = Field(default=120, alias="CHUNK_OVERLAP")
-    top_k: int = Field(default=5, alias="TOP_K")
+    rerank_model: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L-6-v2", alias="RERANK_MODEL"
+    )
+
+    chunk_size: int = Field(default=800, alias="CHUNK_SIZE")  # soft ceiling, in chars
+    chunk_overlap: int = Field(default=120, alias="CHUNK_OVERLAP")  # in chars
+    top_k: int = Field(default=10, alias="TOP_K")  # retrieve broader, then rerank
+    top_k_rerank: int = Field(default=3, alias="TOP_K_RERANK")
+    min_rerank_score: float = Field(default=0.1, alias="MIN_RERANK_SCORE")
+
+    conversation_window: int = Field(default=6, alias="CONVERSATION_WINDOW")
 
     cors_origins: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173", alias="CORS_ORIGINS"

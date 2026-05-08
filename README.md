@@ -1,46 +1,104 @@
 # RAG Studio
 
-A full-stack Retrieval-Augmented Generation chatbot. FastAPI backend + React/TypeScript frontend. Ingests PDFs, Markdown, text, and web URLs into Pinecone, then answers questions with Groq-hosted Llama and streams citations back to the UI.
+A retrieval-augmented chatbot built around a real RAG pipeline — query rewriting,
+hybrid retrieve-then-rerank, a hallucination guardrail, conversation memory, dedup
+on ingest, and a Ragas evaluation harness.
+
+## Pipeline
+
+```
+            ┌────────────────────────────────────────────────────────────────┐
+            │                       /chat/stream                              │
+            │                                                                 │
+ user msg ─►│ memory[session] ─► rewrite (LLM) ─► embed ─► retrieve (Pinecone)│
+            │                                                       │        │
+            │                                                       ▼        │
+            │                                              cross-encoder rerank│
+            │                                                       │        │
+            │                                                       ▼        │
+            │                                  guardrail: max(rerank) ≥ τ ?  │
+            │                                          │                      │
+            │                            no ◄──────────┴──────────► yes      │
+            │                            │                          │        │
+            │                            ▼                          ▼        │
+            │             "no relevant context"           Llama 3.3 70B (Groq)│
+            │                            │                          │        │
+            └────────────────────────────┴──────────────┬───────────┴────────┘
+                                                        ▼
+                                            SSE: session, rewrite,
+                                            sources(+chunks+rerank),
+                                            tokens, done
+```
 
 ## Stack
 
 - **Backend:** Python 3.11, FastAPI, Uvicorn
 - **LLM:** [Groq](https://console.groq.com) free tier (`llama-3.3-70b-versatile`)
-- **Embeddings:** local `sentence-transformers/all-MiniLM-L6-v2` (no API key, runs on CPU)
+- **Embeddings:** local `sentence-transformers/all-MiniLM-L6-v2` (no key)
+- **Reranker:** local `cross-encoder/ms-marco-MiniLM-L-6-v2` (no key)
 - **Vector store:** Pinecone serverless free tier
 - **Frontend:** React 18 + Vite + TypeScript + Tailwind + Framer Motion + Recharts
+- **Evaluation:** Ragas (faithfulness, answer relevancy, context recall)
+
+## What the pipeline actually does
+
+1. **Conversation memory.** Each chat session gets a UUID; the last
+   `CONVERSATION_WINDOW` (default 6) user/assistant turns live in an in-memory
+   buffer keyed by session id. Resets on server restart.
+2. **Query rewrite.** If the new message looks like a follow-up — short, or
+   contains pronouns like *it / that / those / the second one* — it's
+   rewritten via Groq into a self-contained, retrieval-optimized question
+   using the last two turns. The original question is what the model
+   eventually answers.
+3. **Embed + retrieve.** The rewritten query is embedded locally and the top
+   `TOP_K` (default 10) most similar chunks are pulled from Pinecone.
+4. **Rerank.** A cross-encoder re-scores each `(query, chunk)` pair and the
+   top `TOP_K_RERANK` (default 3) chunks survive. The `sources` SSE event
+   carries both the vector similarity (`score`) and the rerank score
+   (`rerank_score`).
+5. **Hallucination guardrail.** If the best post-rerank score is below
+   `MIN_RERANK_SCORE` (default 0.1) the LLM is **not called** — the user gets
+   a single deterministic "I couldn't find relevant information…" instead.
+6. **Generate + stream.** The conversation history + retrieved context + the
+   user's original question are sent to Groq and the answer streams back to
+   the frontend over Server-Sent Events.
+7. **Ingest dedup.** Each chunk is SHA-256 hashed; deterministic vector ids
+   let us skip chunks already present in Pinecone. The ingest response
+   reports `{total_chunks, new_chunks, skipped_chunks}` and the frontend
+   toast shows it.
+8. **Sentence-aware chunking.** Text is split first on paragraph breaks
+   (hard splits), then packed sentence-by-sentence under `CHUNK_SIZE` (a soft
+   ceiling in characters). Sentences are never broken.
 
 ## Quick start
 
-You will need two free accounts (no card required):
-- A Groq API key from https://console.groq.com → API Keys
-- A Pinecone API key from https://app.pinecone.io → API Keys
+You need two free accounts (no card required):
+- A Groq API key — https://console.groq.com → API Keys
+- A Pinecone API key — https://app.pinecone.io → API Keys
 
-### 1. Backend
+### Backend
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-cp .env.example .env
-# open backend/.env and paste GROQ_API_KEY + PINECONE_API_KEY
+cp .env.example .env       # paste GROQ_API_KEY + PINECONE_API_KEY
 
 uvicorn app.main:app --reload --port 8000
 ```
 
-On startup the backend will:
-1. Validate that required env vars are present (logs a friendly error + keeps running, surfaced via `/health`).
-2. Warm the embedding model (downloads ~80MB the first time, then cached).
-3. Create the Pinecone index if it doesn't exist.
+On startup, the backend:
+- validates required env vars (logs a friendly error and stays up — `/health` reports the same),
+- warms the embedding and reranker models (each is ~80–90MB the first time, then cached),
+- creates the Pinecone index if it doesn't exist.
 
-Sanity check:
 ```bash
 curl http://localhost:8000/health
 # -> {"status":"ok","missing_env":[],"model":"llama-3.3-70b-versatile",...}
 ```
 
-### 2. Frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -48,58 +106,94 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. You can also `cp .env.example .env` if you need to point the frontend at a different backend URL via `VITE_API_URL`.
+Open http://localhost:5173.
 
-### 3. Use it
+### Use it
 
-Either via the UI:
-- **Knowledge Base** view → drop a PDF/MD/TXT or paste a URL.
-- **Chat** view → ask a question. Tokens stream in; citations appear under each answer; the right-hand Context Inspector shows the exact chunks used.
+In the UI:
+- **Knowledge Base** — drop a PDF/MD/TXT or paste a URL.
+- **Chat** — ask a question. Tokens stream; citations appear under each answer; the Context Inspector on the right shows each retrieved chunk with both its `sim` (vector cosine) and `rr` (rerank) score.
 
-Or via the CLI:
+CLI ingest:
 ```bash
 cd backend
 python scripts/ingest_cli.py data/sample.pdf
 python scripts/ingest_cli.py https://example.com/article
 ```
 
-## Configuration reference
+## Evaluation
 
-All values live in `backend/.env` (see `backend/.env.example` for documentation):
+Ragas-based metrics — faithfulness, answer relevancy, context recall — over a small
+local test set.
 
-| Variable | Required | Default | Notes |
+```bash
+cd backend
+pip install -e ".[eval]"          # extras: ragas, datasets, langchain-groq, langchain-huggingface
+python scripts/eval_rag.py        # uses data/eval_set.json by default
+```
+
+Output: a per-question table to stdout and a JSON dump at `backend/data/eval_results.json`.
+The bundled `data/eval_set.json` has 5 generic placeholder questions —
+replace them with your own.
+
+The judge LLM is your configured Groq model; the judge embeddings are the
+same local model used for retrieval. **No new API keys are required.**
+
+## Configuration
+
+All values live in `backend/.env` (see `backend/.env.example` for full comments):
+
+| Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `GROQ_API_KEY` | yes | — | Free at console.groq.com |
-| `PINECONE_API_KEY` | yes | — | Free at app.pinecone.io |
-| `GROQ_MODEL` | no | `llama-3.3-70b-versatile` | Any chat model on Groq |
-| `PINECONE_INDEX` | no | `rag-chatbot` | Auto-created if missing |
-| `PINECONE_CLOUD` | no | `aws` | `aws` or `gcp` |
-| `PINECONE_REGION` | no | `us-east-1` | Match your Pinecone project |
-| `EMBED_MODEL` | no | `sentence-transformers/all-MiniLM-L6-v2` | If you change this, also bump `embed_dim` in `app/config.py` |
-| `CHUNK_SIZE` | no | `800` | Approx tokens per chunk |
-| `CHUNK_OVERLAP` | no | `120` | Approx tokens of overlap |
-| `TOP_K` | no | `5` | Chunks retrieved per query |
-| `CORS_ORIGINS` | no | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated |
+| `GROQ_API_KEY` | ✓ | — | LLM provider |
+| `PINECONE_API_KEY` | ✓ | — | Vector store |
+| `GROQ_MODEL` | | `llama-3.3-70b-versatile` | Any chat model on Groq |
+| `EMBED_MODEL` | | `sentence-transformers/all-MiniLM-L6-v2` | Local; if you change this, also update `embed_dim` in `app/config.py` |
+| `RERANK_MODEL` | | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Local cross-encoder |
+| `PINECONE_INDEX` | | `rag-chatbot` | Auto-created |
+| `PINECONE_CLOUD` | | `aws` | `aws` / `gcp` |
+| `PINECONE_REGION` | | `us-east-1` | Match your project |
+| `CHUNK_SIZE` | | `800` | Soft ceiling per chunk (characters) |
+| `CHUNK_OVERLAP` | | `120` | Trailing-sentence carry, characters |
+| `TOP_K` | | `10` | Pinecone returns this many before reranking |
+| `TOP_K_RERANK` | | `3` | Survivors after the cross-encoder |
+| `MIN_RERANK_SCORE` | | `0.1` | Below this → guardrail blocks the LLM call |
+| `CONVERSATION_WINDOW` | | `6` | Recent turns kept in the per-session buffer |
+| `CORS_ORIGINS` | | localhost:5173 | Comma-separated |
 
 Frontend (`frontend/.env`):
 
 | Variable | Required | Default |
 |---|---|---|
-| `VITE_API_URL` | no | `http://localhost:8000` |
+| `VITE_API_URL` | | `http://localhost:8000` |
 
 ## API
 
 | Method | Path | Body | Description |
 |---|---|---|---|
-| GET | `/health` | — | Returns `{status, missing_env, model, embed_model, pinecone_index}` |
-| POST | `/ingest/file?namespace=…` | multipart `file` | PDF / MD / TXT / RST |
-| POST | `/ingest/url` | `{url, namespace?}` | Fetches and ingests a web page |
-| POST | `/chat/stream` | `{message, top_k?, namespace?}` | Server-sent events: `sources`, `token`, `done`, `error` |
+| GET | `/health` | — | Status + active model + retrieval/guardrail config |
+| POST | `/ingest/file?namespace=…` | multipart `file` | Returns `{source, total_chunks, new_chunks, skipped_chunks, upserted}` |
+| POST | `/ingest/url` | `{url, namespace?}` | Same shape as `/ingest/file` |
+| POST | `/chat/stream` | `{message, session_id?, top_k?, namespace?}` | SSE: `session`, `rewrite?`, `sources`, `token…`, `done` |
 
-The `sources` event includes both filenames and full chunk metadata:
+The `sources` event includes a `chunks` array with full per-chunk metadata:
 ```json
-{"type":"sources","sources":["report.pdf"],"chunks":[{"source":"report.pdf","chunk_idx":3,"score":0.82,"text":"…"}]}
+{
+  "type": "sources",
+  "sources": ["report.pdf"],
+  "chunks": [
+    {
+      "source": "report.pdf",
+      "chunk_idx": 3,
+      "score": 0.82,
+      "rerank_score": 5.41,
+      "text": "…"
+    }
+  ]
+}
 ```
+
+If guardrail blocks the call, the `done` event includes `"guardrail":"no_relevant_context"`.
 
 ## Tests
 
@@ -108,7 +202,10 @@ cd backend
 pytest
 ```
 
-Tests mock Groq and Pinecone — no network needed.
+The unit tests cover: sentence-aware chunking, deduplication on ingest, the
+follow-up heuristic + LLM rewrite (with mocked LLM), reranker sort order, the
+guardrail (blocks when no chunk clears the threshold and when retrieval returns
+nothing), full pipeline event order, and the conversation memory window.
 
 ## Deploy
 
@@ -119,13 +216,28 @@ Tests mock Groq and Pinecone — no network needed.
 
 ```
 backend/
-  app/{config,embeddings,vectorstore,ingest,llm,rag,main}.py
-  scripts/ingest_cli.py
-  tests/test_rag.py
+  app/
+    config.py        # pydantic-settings; reads .env
+    embeddings.py    # local SentenceTransformer (lazy singleton)
+    reranker.py      # local CrossEncoder (lazy singleton)
+    vectorstore.py   # Pinecone client + existing_ids() for dedup
+    ingest.py        # sentence-aware chunker + SHA-256 dedup
+    memory.py        # in-memory per-session conversation buffer
+    llm.py           # Groq SDK wrapper (chat_stream + chat_once)
+    rag.py           # rewrite → retrieve → rerank → guardrail → generate
+    main.py          # FastAPI app + lifespan warm-up + SSE endpoint
+  scripts/
+    ingest_cli.py
+    eval_rag.py      # Ragas evaluation
+  data/
+    eval_set.json    # sample evaluation questions
+  tests/
+    test_rag.py
 frontend/
-  src/{App,main}.tsx
-  src/components/{Layout,Chat,KnowledgeBase,Dashboard,Analytics,Settings,UI}/*.tsx
-  src/lib/{api,errors,store}.ts
+  src/
+    App.tsx
+    components/{Layout,Chat,KnowledgeBase,Dashboard,Analytics,Settings,UI}/*.tsx
+    lib/{api,errors,store}.ts
 ```
 
 ## License

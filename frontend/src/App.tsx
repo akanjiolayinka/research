@@ -10,7 +10,15 @@ import RightDrawer from "./components/Layout/RightDrawer";
 import Sidebar, { type View } from "./components/Layout/Sidebar";
 import TopBar from "./components/Layout/TopBar";
 import SettingsView from "./components/Settings/SettingsView";
-import { ingestFile, streamChat, type RetrievedChunk } from "./lib/api";
+import { ingestFile, streamChat, type IngestResult, type RetrievedChunk } from "./lib/api";
+
+function dedupSummary(result: IngestResult): string {
+  const parts: string[] = [`${result.total_chunks} chunks`];
+  if (result.new_chunks > 0) parts.push(`${result.new_chunks} new`);
+  if (result.skipped_chunks > 0)
+    parts.push(`${result.skipped_chunks} skipped (already indexed)`);
+  return parts.join(" · ");
+}
 import { humanize } from "./lib/errors";
 import {
   deriveTitle,
@@ -142,7 +150,19 @@ export default function App() {
       await streamChat(
         text,
         (event) => {
-          if (event.type === "sources") {
+          if (event.type === "session") {
+            // backend may have generated one — adopt it for future turns
+            return;
+          } else if (event.type === "rewrite") {
+            updateSession(sessionId, (s) => ({
+              ...s,
+              messages: s.messages.map((m) =>
+                m.id === assistantId
+                  ? { ...m, rewrittenQuery: event.rewritten }
+                  : m,
+              ),
+            }));
+          } else if (event.type === "sources") {
             setLastSources(event.sources);
             setLastChunks(event.chunks ?? []);
             updateSession(sessionId, (s) => ({
@@ -182,7 +202,7 @@ export default function App() {
             toast.error(e.title, { description: e.detail });
           }
         },
-        { signal: controller.signal, namespace },
+        { signal: controller.signal, namespace, sessionId },
       );
     } catch (err) {
       if (controller.signal.aborted) {
@@ -247,12 +267,14 @@ export default function App() {
       const result = await ingestFile(file, { namespace });
       const updated = next.map((d) =>
         d.id === optimistic.id
-          ? { ...d, chunks: result.chunks, status: "indexed" as const }
+          ? { ...d, chunks: result.total_chunks, status: "indexed" as const }
           : d,
       );
       setDocs(updated);
       saveDocs(updated);
-      toast.success(`Indexed ${result.source} (${result.chunks} chunks)`);
+      toast.success(`Indexed ${result.source}`, {
+        description: dedupSummary(result),
+      });
     } catch (err) {
       const e = humanize(err);
       const updated = next.map((d) =>

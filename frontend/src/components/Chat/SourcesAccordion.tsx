@@ -14,6 +14,13 @@ function scoreColor(score: number) {
   return "text-rose-400";
 }
 
+function rerankColor(score: number) {
+  if (score >= 5) return "text-emerald-400";
+  if (score >= 1) return "text-slate-300";
+  if (score >= 0.1) return "text-amber-400";
+  return "text-rose-400";
+}
+
 export default function SourcesAccordion({ sources, chunks }: Props) {
   const [open, setOpen] = useState(false);
   if (!sources || sources.length === 0) return null;
@@ -62,11 +69,21 @@ export default function SourcesAccordion({ sources, chunks }: Props) {
                     {c.source}
                     <span className="ml-2 text-slate-500">#{c.chunk_idx}</span>
                   </p>
-                  {c.score > 0 && (
-                    <span className={`font-mono text-[11px] ${scoreColor(c.score)}`}>
-                      {c.score.toFixed(2)}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 font-mono text-[11px] tabular-nums">
+                    {c.score > 0 && (
+                      <span className={scoreColor(c.score)} title="Vector similarity">
+                        sim {c.score.toFixed(2)}
+                      </span>
+                    )}
+                    {c.rerank_score !== undefined && (
+                      <span
+                        className={rerankColor(c.rerank_score)}
+                        title="Cross-encoder rerank"
+                      >
+                        rr {c.rerank_score.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="line-clamp-4 text-[11px] leading-relaxed text-slate-400">
                   {c.text}

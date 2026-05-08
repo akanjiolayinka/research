@@ -1,7 +1,14 @@
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ingestFile, ingestUrl } from "../../lib/api";
+import { ingestFile, ingestUrl, type IngestResult } from "../../lib/api";
+
+function dedupSummary(result: IngestResult): string {
+  const parts: string[] = [`${result.total_chunks} chunks`];
+  if (result.new_chunks > 0) parts.push(`${result.new_chunks} new`);
+  if (result.skipped_chunks > 0) parts.push(`${result.skipped_chunks} skipped (already indexed)`);
+  return parts.join(" · ");
+}
 import { humanize } from "../../lib/errors";
 import {
   inferDocType,
@@ -67,11 +74,11 @@ export default function KnowledgeBaseView({
         onProgress: (loaded, total) => setProgress(loaded / total),
       });
       persist([
-        { ...optimistic, chunks: result.chunks, status: "indexed" },
+        { ...optimistic, chunks: result.total_chunks, status: "indexed" },
         ...docs,
       ]);
       toast.success(`Indexed ${result.source}`, {
-        description: `${result.chunks} chunks`,
+        description: dedupSummary(result),
       });
     } catch (err) {
       const e = humanize(err);
@@ -105,11 +112,16 @@ export default function KnowledgeBaseView({
       clearTimeout(stepTimer2);
       setStep("done");
       persist([
-        { ...optimistic, chunks: result.chunks, status: "indexed", name: result.source },
+        {
+          ...optimistic,
+          chunks: result.total_chunks,
+          status: "indexed",
+          name: result.source,
+        },
         ...docs,
       ]);
       toast.success(`Indexed ${result.source}`, {
-        description: `${result.chunks} chunks`,
+        description: dedupSummary(result),
       });
     } catch (err) {
       clearTimeout(stepTimer);

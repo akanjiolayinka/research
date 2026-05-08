@@ -9,6 +9,7 @@ export interface ChatMessage {
   chunks?: RetrievedChunk[];
   pending?: boolean;
   error?: { title: string; detail: string };
+  rewrittenQuery?: string;
   createdAt: number;
 }
 

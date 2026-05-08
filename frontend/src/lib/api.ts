@@ -5,19 +5,26 @@ export interface RetrievedChunk {
   source: string;
   chunk_idx: number;
   score: number;
+  rerank_score?: number;
   text: string;
 }
 
 export type StreamEvent =
+  | { type: "session"; session_id: string }
+  | { type: "rewrite"; original: string; rewritten: string }
   | { type: "sources"; sources: string[]; chunks?: RetrievedChunk[] }
   | { type: "token"; text: string }
-  | { type: "done" }
+  | { type: "done"; guardrail?: string }
   | { type: "error"; message: string };
 
 export interface IngestResult {
   source: string;
-  chunks: number;
+  total_chunks: number;
+  new_chunks: number;
+  skipped_chunks: number;
   upserted: number;
+  // legacy field retained for older clients/tests
+  chunks?: number;
 }
 
 async function readError(res: Response): Promise<string> {
@@ -90,7 +97,12 @@ export async function ingestUrl(url: string, namespace?: string): Promise<Ingest
 export async function streamChat(
   message: string,
   onEvent: (event: StreamEvent) => void,
-  opts?: { topK?: number; signal?: AbortSignal; namespace?: string },
+  opts?: {
+    topK?: number;
+    signal?: AbortSignal;
+    namespace?: string;
+    sessionId?: string;
+  },
 ): Promise<void> {
   const res = await fetch(`${API_URL}/chat/stream`, {
     method: "POST",
@@ -99,6 +111,7 @@ export async function streamChat(
       message,
       top_k: opts?.topK,
       namespace: opts?.namespace,
+      session_id: opts?.sessionId,
     }),
     signal: opts?.signal,
   });

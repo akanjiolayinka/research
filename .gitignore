@@ -19,9 +19,10 @@ backend/.env
 frontend/.env
 frontend/.env.local
 
-# Data
+# Data — ignore user-dropped files but keep evaluation inputs in version control
 backend/data/*
 !backend/data/.gitkeep
+!backend/data/eval_set.json
 
 # Node
 node_modules/

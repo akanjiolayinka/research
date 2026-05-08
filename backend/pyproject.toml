@@ -23,6 +23,12 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
 ]
+eval = [
+    "ragas>=0.2",
+    "datasets>=2.20",
+    "langchain-groq>=0.2",
+    "langchain-huggingface>=0.1",
+]
 
 [build-system]
 requires = ["setuptools>=68"]

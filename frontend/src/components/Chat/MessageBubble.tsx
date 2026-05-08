@@ -43,6 +43,12 @@ export default function MessageBubble({ message, onRetry }: Props) {
       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
         Assistant
       </div>
+      {message.rewrittenQuery && (
+        <p className="text-[11px] text-slate-500">
+          Searched as:{" "}
+          <span className="font-mono text-slate-400">{message.rewrittenQuery}</span>
+        </p>
+      )}
       {message.error ? (
         <ErrorBanner
           title={message.error.title}
