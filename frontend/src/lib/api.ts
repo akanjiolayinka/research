@@ -94,6 +94,58 @@ export async function ingestUrl(url: string, namespace?: string): Promise<Ingest
   return res.json();
 }
 
+export interface EvalResults {
+  summary: {
+    faithfulness?: number;
+    answer_relevancy?: number;
+    context_recall?: number;
+    [key: string]: number | undefined;
+  };
+  rows?: Array<Record<string, unknown>>;
+}
+
+export async function getEvalResults(): Promise<EvalResults | null> {
+  const res = await fetch(`${API_URL}/eval/results`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export type EvalRunEvent =
+  | { type: "log"; line: string }
+  | { type: "done"; exit_code: number; results: EvalResults | null }
+  | { type: "error"; message: string };
+
+export async function runEval(
+  onEvent: (event: EvalRunEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${API_URL}/eval/run`, { method: "POST", signal });
+  if (!res.ok || !res.body) throw new Error(await readError(res));
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sepIdx: number;
+    while ((sepIdx = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, sepIdx);
+      buffer = buffer.slice(sepIdx + 2);
+      const line = raw.trim();
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload) continue;
+      try {
+        onEvent(JSON.parse(payload) as EvalRunEvent);
+      } catch {
+        // ignore malformed event
+      }
+    }
+  }
+}
+
 export async function streamChat(
   message: string,
   onEvent: (event: StreamEvent) => void,

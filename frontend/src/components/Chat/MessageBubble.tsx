@@ -1,10 +1,12 @@
 import clsx from "clsx";
-import { Check, Copy, ThumbsDown, ThumbsUp } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { Bug, Check, Copy, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "../../lib/store";
 import ErrorBanner from "../UI/ErrorBanner";
+import DebugPanel from "./DebugPanel";
 import SourcesAccordion from "./SourcesAccordion";
 import TypingIndicator from "./TypingIndicator";
 
@@ -17,6 +19,7 @@ export default function MessageBubble({ message, onRetry }: Props) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
+  const [debugOpen, setDebugOpen] = useState(false);
 
   async function copy() {
     try {
@@ -38,17 +41,16 @@ export default function MessageBubble({ message, onRetry }: Props) {
     );
   }
 
+  const hasDebug =
+    !!message.rewrittenQuery ||
+    !!message.guardrail ||
+    (message.chunks?.length ?? 0) > 0;
+
   return (
     <div className="group flex flex-col gap-2">
       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
         Assistant
       </div>
-      {message.rewrittenQuery && (
-        <p className="text-[11px] text-slate-500">
-          Searched as:{" "}
-          <span className="font-mono text-slate-400">{message.rewrittenQuery}</span>
-        </p>
-      )}
       {message.error ? (
         <ErrorBanner
           title={message.error.title}
@@ -72,11 +74,14 @@ export default function MessageBubble({ message, onRetry }: Props) {
           {message.sources && (
             <SourcesAccordion sources={message.sources} chunks={message.chunks} />
           )}
+          <AnimatePresence initial={false}>
+            {debugOpen && hasDebug && <DebugPanel message={message} />}
+          </AnimatePresence>
         </>
       )}
 
       {!message.pending && !message.error && (
-        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100 has-[button[aria-pressed=true]]:opacity-100">
           <button
             type="button"
             onClick={copy}
@@ -110,6 +115,21 @@ export default function MessageBubble({ message, onRetry }: Props) {
           >
             <ThumbsDown size={12} />
           </button>
+          {hasDebug && (
+            <button
+              type="button"
+              onClick={() => setDebugOpen((v) => !v)}
+              aria-pressed={debugOpen}
+              className={clsx(
+                "btn-ghost h-7 w-7 p-0",
+                debugOpen && "text-accent-400",
+              )}
+              aria-label="Toggle debug panel"
+              title="Pipeline trace"
+            >
+              <Bug size={12} />
+            </button>
+          )}
         </div>
       )}
     </div>

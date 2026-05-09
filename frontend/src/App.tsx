@@ -1,16 +1,38 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
-import AnalyticsView from "./components/Analytics/AnalyticsView";
 import ChatInput from "./components/Chat/ChatInput";
-import ChatView from "./components/Chat/ChatView";
-import DashboardView from "./components/Dashboard/DashboardView";
-import KnowledgeBaseView from "./components/KnowledgeBase/KnowledgeBaseView";
 import RightDrawer from "./components/Layout/RightDrawer";
 import Sidebar, { type View } from "./components/Layout/Sidebar";
 import TopBar from "./components/Layout/TopBar";
-import SettingsView from "./components/Settings/SettingsView";
+import Spinner from "./components/UI/Spinner";
 import { ingestFile, streamChat, type IngestResult, type RetrievedChunk } from "./lib/api";
+
+// Lazy-loaded view modules. Each one becomes its own JS chunk so the initial
+// bundle stays under 200KB gzipped.
+const DashboardView = lazy(() => import("./components/Dashboard/DashboardView"));
+const ChatView = lazy(() => import("./components/Chat/ChatView"));
+const KnowledgeBaseView = lazy(
+  () => import("./components/KnowledgeBase/KnowledgeBaseView"),
+);
+const AnalyticsView = lazy(() => import("./components/Analytics/AnalyticsView"));
+const SettingsView = lazy(() => import("./components/Settings/SettingsView"));
+
+function ViewFallback() {
+  return (
+    <div className="flex h-full items-center justify-center text-slate-500">
+      <Spinner size={20} />
+    </div>
+  );
+}
 
 function dedupSummary(result: IngestResult): string {
   const parts: string[] = [`${result.total_chunks} chunks`];
@@ -129,6 +151,7 @@ export default function App() {
       role: "assistant",
       content: "",
       pending: true,
+      originalQuery: text,
       createdAt: Date.now(),
     };
 
@@ -183,10 +206,13 @@ export default function App() {
               ),
             }));
           } else if (event.type === "done") {
+            const guardrail = event.guardrail;
             updateSession(sessionId, (s) => ({
               ...s,
               messages: s.messages.map((m) =>
-                m.id === assistantId ? { ...m, pending: false } : m,
+                m.id === assistantId
+                  ? { ...m, pending: false, guardrail }
+                  : m,
               ),
             }));
           } else if (event.type === "error") {
@@ -413,7 +439,7 @@ export default function App() {
                 transition={{ duration: 0.12 }}
                 className="flex h-full min-h-0 flex-1 flex-col"
               >
-                {renderMain()}
+                <Suspense fallback={<ViewFallback />}>{renderMain()}</Suspense>
               </motion.div>
             </AnimatePresence>
           </main>

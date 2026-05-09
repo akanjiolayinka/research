@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import type { ChatSession } from "../../lib/store";
+import EvalScores from "./EvalScores";
 
 interface Props {
   sessions: ChatSession[];
@@ -88,6 +89,8 @@ export default function AnalyticsView({ sessions }: Props) {
           Computed from your local chat history.
         </p>
       </div>
+
+      <EvalScores />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Queries — last 7 days">

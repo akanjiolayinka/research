@@ -139,6 +139,27 @@ replace them with your own.
 The judge LLM is your configured Groq model; the judge embeddings are the
 same local model used for retrieval. **No new API keys are required.**
 
+You can also run the eval interactively from the **Analytics** view in the UI:
+the *Eval scores* card reads `data/eval_results.json` and shows the metrics as a
+bar chart. If the file doesn't exist yet, click *Run evaluation* — the frontend
+streams live logs from the subprocess via SSE and renders the chart when the run
+completes (`POST /eval/run`, `GET /eval/results`).
+
+## Pipeline trace (debug panel)
+
+Every assistant message that involves retrieval gets a small bug-icon button in
+its hover toolbar. Clicking it expands an inline debug panel showing:
+
+- the **original** question,
+- the **rewritten** standalone query (when the rewrite step fired),
+- each retrieved chunk with both its vector similarity (`sim`) and cross-encoder
+  rerank score (`rr`),
+- whether the **guardrail** fired (when no chunk cleared `MIN_RERANK_SCORE`,
+  the panel shows *"No relevant context found — LLM was not called"* instead of
+  scores).
+
+The default chat UI stays clean — the pipeline trace is opt-in per message.
+
 ## Configuration
 
 All values live in `backend/.env` (see `backend/.env.example` for full comments):
@@ -175,6 +196,8 @@ Frontend (`frontend/.env`):
 | POST | `/ingest/file?namespace=…` | multipart `file` | Returns `{source, total_chunks, new_chunks, skipped_chunks, upserted}` |
 | POST | `/ingest/url` | `{url, namespace?}` | Same shape as `/ingest/file` |
 | POST | `/chat/stream` | `{message, session_id?, top_k?, namespace?}` | SSE: `session`, `rewrite?`, `sources`, `token…`, `done` |
+| GET | `/eval/results` | — | Returns the latest Ragas results JSON, or 404 if none yet |
+| POST | `/eval/run` | — | Runs `scripts/eval_rag.py` as a subprocess; SSE stream of `log` events then a final `done` with parsed results |
 
 The `sources` event includes a `chunks` array with full per-chunk metadata:
 ```json

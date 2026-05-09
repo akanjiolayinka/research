@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sys
@@ -16,6 +17,10 @@ from pydantic import BaseModel
 from .config import get_settings
 from .ingest import ingest_source
 from .rag import answer_stream
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+EVAL_RESULTS_PATH = BACKEND_DIR / "data" / "eval_results.json"
+EVAL_SCRIPT_PATH = BACKEND_DIR / "scripts" / "eval_rag.py"
 
 logger = logging.getLogger("rag")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -165,6 +170,72 @@ def chat_stream_endpoint(req: ChatRequest):
 
     return StreamingResponse(
         event_source(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/eval/results")
+def eval_results():
+    """Return the most recent Ragas eval results, or 404 if none exist."""
+    if not EVAL_RESULTS_PATH.exists():
+        raise HTTPException(status_code=404, detail="No eval results yet")
+    try:
+        return json.loads(EVAL_RESULTS_PATH.read_text())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not read results: {exc}") from exc
+
+
+@app.post("/eval/run")
+def eval_run():
+    """Run scripts/eval_rag.py as a subprocess; stream stdout as SSE log
+    events, then emit a final event with the parsed results JSON."""
+    if not EVAL_SCRIPT_PATH.exists():
+        raise HTTPException(status_code=500, detail="Eval script missing")
+
+    async def gen():
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                str(EVAL_SCRIPT_PATH),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=str(BACKEND_DIR),
+            )
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            return
+
+        assert proc.stdout is not None
+        while True:
+            raw = await proc.stdout.readline()
+            if not raw:
+                break
+            line = raw.decode(errors="replace").rstrip()
+            if line:
+                yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
+
+        await proc.wait()
+        results = None
+        if EVAL_RESULTS_PATH.exists():
+            try:
+                results = json.loads(EVAL_RESULTS_PATH.read_text())
+            except Exception:
+                results = None
+        yield (
+            "data: "
+            + json.dumps(
+                {
+                    "type": "done",
+                    "exit_code": proc.returncode,
+                    "results": results,
+                }
+            )
+            + "\n\n"
+        )
+
+    return StreamingResponse(
+        gen(),
         media_type="text/event-stream",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )
