@@ -1,0 +1,27 @@
+[
+  {
+    "question": "What is the capital of France?",
+    "ground_truth_answer": "Paris is the capital of France.",
+    "source_doc": "geography_basics.md"
+  },
+  {
+    "question": "Who wrote Romeo and Juliet?",
+    "ground_truth_answer": "William Shakespeare wrote Romeo and Juliet.",
+    "source_doc": "literature_basics.md"
+  },
+  {
+    "question": "What does the photosynthesis process produce?",
+    "ground_truth_answer": "Photosynthesis produces glucose and oxygen from carbon dioxide and water using sunlight.",
+    "source_doc": "biology_basics.md"
+  },
+  {
+    "question": "What is the speed of light in a vacuum?",
+    "ground_truth_answer": "The speed of light in a vacuum is approximately 299,792,458 meters per second.",
+    "source_doc": "physics_basics.md"
+  },
+  {
+    "question": "What year did World War II end?",
+    "ground_truth_answer": "World War II ended in 1945.",
+    "source_doc": "history_basics.md"
+  }
+]

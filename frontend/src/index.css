@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    font-family: "DM Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #0b0d10;
+  }
+
+  html.light body {
+    color: #0b0d10;
+    background: #f5f6f8;
+  }
+
+  ::selection {
+    background: rgba(99, 102, 241, 0.35);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.16);
+    background-clip: padding-box;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-white/[0.08] bg-panel shadow-card;
+  }
+  .light .panel {
+    @apply border-slate-200 bg-white;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white transition;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: #4f46e5;
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-white/[0.08] bg-panel2 px-3 py-2 text-sm font-medium text-slate-200 transition;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: #1f242a;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-400 transition;
+  }
+  .btn-ghost:hover {
+    color: #e2e8f0;
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+
+  .input-base {
+    @apply w-full rounded-md border border-white/[0.08] bg-panel2 px-3 py-2 text-sm text-slate-200 outline-none transition placeholder:text-slate-500;
+  }
+  .input-base:focus {
+    border-color: rgba(99, 102, 241, 0.6);
+  }
+
+  .markdown {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .markdown p {
+    margin: 0.25rem 0;
+  }
+  .markdown pre {
+    background: #0b0d10;
+    color: #e5e7eb;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.82rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin: 0.5rem 0;
+  }
+  .markdown code {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.85em;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.1em 0.35em;
+    border-radius: 0.3em;
+  }
+  .markdown pre code {
+    background: transparent;
+    padding: 0;
+  }
+  .markdown ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+  }
+  .markdown ol {
+    list-style: decimal;
+    padding-left: 1.25rem;
+  }
+  .markdown a {
+    color: #818cf8;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .markdown h1,
+  .markdown h2,
+  .markdown h3 {
+    font-weight: 600;
+    margin-top: 0.5rem;
+  }
+
+  .stream-caret::after {
+    content: "▋";
+    margin-left: 2px;
+    color: #818cf8;
+    animation: blink 1s steps(2, start) infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+}
