@@ -2,7 +2,7 @@
 
 A retrieval-augmented chatbot built around a real RAG pipeline — query rewriting,
 hybrid retrieve-then-rerank, a hallucination guardrail, conversation memory, dedup
-on ingest, and a Ragas evaluation harness.
+on ingest, and a Ragas evaluation harness
 
 ## Pipeline
 
